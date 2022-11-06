@@ -12,6 +12,11 @@ volatile int play_state = 0;
 void ext_int3_init();
 void ext_int1_init();
 
+uint32_t MicrosSampleTime; // micro 단위로 변환한 sample_time을 저장하는 변수
+uint32_t start_time; //주기적 연산을 시작하는 시간을 저장하는 변수
+float sample_time; //주기적 연산시간을 sec 단위로 저장하는 변수
+
+
 void setup() {
 	/*pinMode(PhaseA, INPUT);
 	pinMode(PhaseB, INPUT);
@@ -20,11 +25,17 @@ void setup() {
 
 	display.begin(16, 2); //2x16 display 설정
 	
+	sample_time = 0.1; //0.02초마다 주기적 연산을 한다.
+	MicrosSampleTime = (uint32_t)(sample_time * 1e6); //0.02 sec를 micro단위로 변환
+
+
 	ext_int3_init(); //INT3 interrupt 초기화
 	ext_int1_init(); //INT1 interrupt 초기화
 	sei(); //golbal interrupt enable 시작
 
 	Serial.begin(115200); //기타 자질구레한 출력값 확인용 시리얼 통신 시작
+	start_time = micros() + MicrosSampleTime; //주기적연산 시작시간 초기화
+
 }
 
 void loop() {
@@ -38,13 +49,17 @@ void loop() {
 	display.setCursor(0, 1); //0번줄 0번째 칸에 커서 위치
 	display.print(state[play_state]); //재생상태 출력 구현 테스트, 나중에 재생상태 표시하는 함수로 다 묶어버리기
 
-	Serial.println(cnt); //자질구레한 출력 확인용 시리얼통신 출력
+	//Serial.println(cnt); //자질구레한 출력 확인용 시리얼통신 출력
 	//Serial.print(" ");
 	//Serial.print(digitalRead(PhaseA));
 	//Serial.print(" ");
 	//Serial.println(digitalRead(PhaseB));
 
-	delay(50); //display 유지를 위한 50ms동안의 delay.
+	//delay(1000); //display 유지를 위한 50ms동안의 delay.
+
+	while (!((start_time - micros()) & 0x80000000)); //주기적 연산시간동안 대기
+	start_time += MicrosSampleTime; //새로운 주기적연산 시작시간 갱신
+
 }
 
 void ext_int3_init() {
@@ -75,5 +90,5 @@ ISR(INT3_vect) {
 
 	if (cnt > 3) cnt = 0;
 
-	else if (cnt < 0) cnt = 3;
+	else if (cnt <= 0) cnt = 0;
 }
