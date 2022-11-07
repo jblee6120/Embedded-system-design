@@ -1,9 +1,9 @@
 {
   "ExpandedNodes": [
     "",
-    "\\encoderinterface",
-    "\\interrupt_12181407",
+    "\\SDtest",
     "\\Test"
   ],
+  "SelectedNode": "\\Test\\Test.ino",
   "PreviewInSolutionExplorer": false
 }
