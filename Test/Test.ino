@@ -3,11 +3,13 @@
 #include <LiquidCrystal.h>
 File root;
 File test;
-File entry[16];
+File entry;
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 const int chipSelect = 53;
 
 void readfile(File dir);
+unsigned char buffer[1000];
+unsigned char info[44];
 
 void setup() {
 	lcd.begin(16, 2);
@@ -19,27 +21,28 @@ void setup() {
 	//entry[1] = root.openNextFile();
 	//test = root.openNextFile();
 
+	entry = SD.open("JB_s1622.WAV");
+	entry.read(info, 44);
+
+
+
+
 	readfile(root);
 
 	Serial.println("test start");
-	for (int i; i < 16; i++) {
-		Serial.println(entry[i].name());
+	for (int i=0; i < 1000; i++) {
+		Serial.println(buffer[i]);
 	}
 	//Serial.println(test.name());
 }
 
 void loop(){
-	for (int i = 0; i < 16; i++) {
-		lcd.setCursor(0, 0);
-		lcd.print(entry[i].name());
-		delay(20);
-	}
 }
 
 void readfile(File dir) {
-	dir.rewindDirectory();
-
-	for (int i = 0; i < 16; i++) {
-		entry[i] = dir.openNextFile();
+	entry.read(buffer, 1000);
+	for (int i = 0; i < 1000; i+=2) {
+		buffer[i] += 0x80;
 	}
-} asdfsadf
+
+}

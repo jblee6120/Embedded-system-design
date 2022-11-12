@@ -2,8 +2,9 @@
   "ExpandedNodes": [
     "",
     "\\SDtest",
-    "\\Test"
+    "\\testm",
+    "\\Wav_file_player"
   ],
-  "SelectedNode": "\\Test\\Test.ino",
+  "SelectedNode": "\\Wav_file_player\\Wav_file_player.ino",
   "PreviewInSolutionExplorer": false
 }
