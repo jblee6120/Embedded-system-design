@@ -1,3 +1,6 @@
+//44.1khz 22.05khz 8-bit mono wav file까지 재생가능한 프로그램
+//16-bit와 stereo file 재생은 아직 불가능...
+
 #include <SPI.h>
 #include <SD.h>
 File entry;
@@ -14,6 +17,7 @@ volatile unsigned short a = 0;
 volatile unsigned short count = 0x00;
 short i = 0;
 void setup() {
+	Serial.begin(115200);
 	DDRB |= 0x10;
 	DDRH |= 0x58;
 	TCCR1A &= ~_BV(WGM10);
@@ -29,7 +33,7 @@ void setup() {
 	TCCR1B &= ~_BV(CS11);
 	TCCR1B &= ~_BV(CS12);
 
-	OCR1A = 384;
+	OCR1A = 362;
 	TCNT1 = 0;
 
 
@@ -63,7 +67,7 @@ void readfile(int num) {
 
 
 void information(File dir) {
-	entry = SD.open("JB_s1622.WAV");
+	entry = SD.open("JB_m844.WAV");
 	for (int i = 0; i < 44; i++) {
 		entry.read();
 	}
@@ -89,7 +93,7 @@ void pwm_init() {
 	TCCR4B &= ~_BV(WGM43);
 	TCCR4B |= _BV(WGM42);
 	TCCR4A &= ~_BV(WGM41);
-	TCCR4A &= ~_BV(WMG40);
+	TCCR4A &= ~_BV(WGM40);
 
 	TCCR4A |= _BV(COM4A1);
 	TCCR4A |= _BV(COM4A0);
@@ -120,11 +124,12 @@ ISR(TIMER1_COMPA_vect) {
 		count &= 0x00;
 	}
 	if (a == 2) a = 0;
-	OCR2B = (buffer[a][count]);
-	OCR2A = ((buffer[a][count + 1] + 0x80) & 0xFF);
-	OCR4B = buffer[a][count + 2];
-	OCR4A = (buffer[a][count + 3] + 0x80) & 0xFF;
+	OCR2A = (buffer[a][count]);
+	//OCR2A = ((buffer[a][count + 1] + 0x80) & 0xFF);
+	//OCR4B = buffer[a][count + 2];
+	//OCR4A = (buffer[a][count + 3] + 0x80) & 0xFF;
 
+	//Serial.println(OCR2B);
 
 	count +=1;
 }
