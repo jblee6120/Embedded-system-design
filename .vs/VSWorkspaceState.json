@@ -1,10 +1,8 @@
 {
   "ExpandedNodes": [
     "",
-    "\\PwmLed_example",
-    "\\Wav",
-    "\\Wav_file_player"
+    "\\displaytest"
   ],
-  "SelectedNode": "\\Wav_file_player\\Wav_file_player.ino",
+  "SelectedNode": "\\displaytest\\displaytest.ino",
   "PreviewInSolutionExplorer": false
 }

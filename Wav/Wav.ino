@@ -1,12 +1,14 @@
 #include <SPI.h>
 #include <SD.h>
 #include <LiquidCrystal.h>
+#include <stdlib.h>
+
 #define PhaseA 18
 #define PhaseB 19
 
 LiquidCrystal display(12, 11, 5, 4, 3, 2);
 File root;
-File entry[16]; //모든 파일들을 담는 파일 배열 생성
+File stage;
 //개발 과정 중 파일명만 따로 뽑아서 출력하고, 한 개의 entry 클래스로
 //cnt 값에 맞는 파일을 열어 entry 클래스에 넣고 파일명을 저장하는 배열에 저장하려 했음.
 //하지만 이러한 방식은 파일 클래스가 제대로 저장되지 않고, 모든 배열에 파일 이름을 넣는 순간
@@ -15,15 +17,13 @@ File entry[16]; //모든 파일들을 담는 파일 배열 생성
 
 
 const int chipSelect = 53;
-char state[2][8] = { "Stopped", "Playing" }; //재생상태 문자열을 담고있는 배열
+char title_list[16][13];
+char fileheader[44];
 
-void readfile();
+void readfile(File dir);
 unsigned char buffer[2][3000];
 unsigned char* ptr;
-
-char channels = 1;
-char sample_rate = 22;
-char bits = 8;
+char* transfer_name2title;
 
 void information();
 void pwm_init();
@@ -37,7 +37,7 @@ volatile unsigned char check0 = 0; //1이면 0번 버퍼 끝 0이면 0번버퍼 
 volatile unsigned char check1 = 0; //1이면 1번 버퍼 끝 0이면 1번버퍼 재생중
 char choice = 1;
 char change = 1;
-char mode = 0;
+char playing_mode = 0;
 
 void ext_int3_init();
 void ext_int1_init();
@@ -48,6 +48,8 @@ void setup() {
     Serial.begin(115200);
 
     DDRD &= ~0x0E; //PD3, PD2, PD1 을 INPUT으로 설정
+    DDRB |= 0x10;
+    DDRH |= 0x58;
 
     display.begin(16, 2); //2x16 display 설정
 
@@ -62,7 +64,7 @@ void setup() {
 }
 
 void loop() {
-
+    Serial.println(OCR2A);
     switch (play_state) {
 
     case 0: //일시정지
@@ -76,9 +78,10 @@ void loop() {
         else {
             display.clear();
             display.setCursor(0, 0); //0번줄 0번째 칸에 커서 위치
-            display.print(entry[cnt].name()); //각 파일 인스턴스의 이름 출력
+            display.print(title_list[cnt]); //각 파일 인스턴스의 이름 출력
             display.setCursor(0, 1); //0번줄 0번째 칸에 커서 위치
             display.print("STOPPED");
+            delay(20);
         }
         break;
 
@@ -88,21 +91,22 @@ void loop() {
             information();
             display.setCursor(0, 1);
             display.print("Playing");
-            entry[cnt].read(buffer[0], 3000);
-            entry[cnt].read(buffer[1], 3000);
+            stage.read(buffer[0], 3000);
+            stage.read(buffer[1], 3000);
             EIMSK &= ~_BV(INT3);
             timer_init();
             pwm_init();
             sei();
             change = 0;
-            //Serial.print(sample_rate, HEX);
-            //Serial.print(" ");
-            //Serial.println(OCR1A);
         }
 
+        if (!(stage.available())) {
+            play_state = 0;
+            choice = 1;
+        }
         switch (check0) {
         case 1:
-            entry[cnt].read(buffer[0], 3000);
+            stage.read(buffer[0], 3000);
             check0 = 0;
             ptr = buffer[0];
         default:
@@ -111,18 +115,16 @@ void loop() {
 
         switch (check1) {
         case 1:
-            entry[cnt].read(buffer[1], 3000);
+            stage.read(buffer[1], 3000);
             check1 = 0;
             ptr = buffer[1];
         default:
             break;
         }
-
+    default:
+        break;
     }
-
-
-
-    //delay(20); //display 유지를 위한 50ms동안의 delay.    
+    //display 유지를 위한 50ms동안의 delay.    
 
 }
 
@@ -147,52 +149,58 @@ void ext_int1_init() {
 }
 
 void information() {
-    for (int i; i < 22; i++) {
-        entry[cnt].read();
+    stage = SD.open(title_list[cnt]);
+    stage.read(fileheader, 44);
+
+    unsigned char channels = fileheader[22];
+    unsigned char sample_rate = fileheader[24];
+    unsigned char bits_per_sample = fileheader[34];
+
+    if ((channels == 1) & (sample_rate == 0x22) & (bits_per_sample == 0x08)) {
+        playing_mode = 0; //mono 22.05k 8bit
     }
 
-    channels = entry[cnt].read(); //23
-    entry[cnt].read(); //24
-    sample_rate = entry[cnt].read(); //25
-
-    for (int i = 0; i < 9; i++) {
-        entry[cnt].read();
-    }
-    
-    bits = entry[cnt].read();
-
-    for (int i = 0; i < 4; i++) {
-        entry[cnt].read();
+    else if ((channels == 1) & (sample_rate == 0x22) & (bits_per_sample == 0x10)) {
+        playing_mode = 1; //mono 22.05k 16bit
     }
 
-    switch (channels & bits) {
-    case 9:
-        mode = 0;
-        break;
-    case 10:
-        mode = 1;
-        break;
-    case 17:
-        mode = 2;
-        break;
-    case 18:
-        mode = 3;
-        break;
+    else if ((channels == 1) & (sample_rate == 0x44) & (bits_per_sample == 0x08)) {
+        playing_mode = 2; //mono 44.1k 8bit
     }
+
+    else if ((channels == 1) & (sample_rate == 0x44) & (bits_per_sample == 0x10)) {
+        playing_mode = 3; //mono 44.1k 16bit
+    }
+
+    else if ((channels == 2) & (sample_rate == 0x22) & (bits_per_sample == 0x08)) {
+        playing_mode = 4; //stereo 22.05k 8bit
+    }
+
+    else if ((channels == 2) & (sample_rate == 0x22) & (bits_per_sample == 0x10)) {
+        playing_mode = 5; //stereo 22.05k 16bit
+    }
+
+    else if ((channels == 2) & (sample_rate == 0x44) & (bits_per_sample == 0x08)) {
+        playing_mode = 6; //stereo 44.1k 8bit
+    }
+
+    else if ((channels == 2) & (sample_rate == 0x44) & (bits_per_sample == 0x10)) {
+        playing_mode = 7; //stereo 44.1k 16bit
+    }
+
 }
 
 
 void readfile(File dir) {
-    dir.rewindDirectory();
-    dir.openNextFile();
+    root.openNextFile();
     for (int i = 0; i < 16; i++) {
-        entry[i] = dir.openNextFile();
+        stage = root.openNextFile();
+        transfer_name2title = stage.name();
+        strcpy(title_list[i], transfer_name2title);
     }
 }
 
 void timer_init() {
-    DDRB |= 0x10;
-    DDRH |= 0b01011000;
     TCCR1A &= ~_BV(WGM10);
     TCCR1A &= ~_BV(WGM11);
 
@@ -206,18 +214,20 @@ void timer_init() {
     TCCR1B &= ~_BV(CS11);
     TCCR1B &= ~_BV(CS12);
 
-    OCR1A = 326;
-    switch (sample_rate) {
+    //OCR1A = 724;
+    switch (fileheader[24]) {
     case 0x22:
         OCR1A = 724;
         break;
+
     case 0x44:
-        OCR1A = 326;
+        OCR1A = 362;
         break;
 
     default:
         break;
     }
+
     TCNT1 = 0;
 
     TIMSK1 |= _BV(OCIE1A);
@@ -241,17 +251,10 @@ void pwm_init() {
     TCCR2B &= ~_BV(CS22);
 
     //Timer counter 4 초기화
-    TCCR4B &= ~_BV(WGM43);
-    TCCR4B |= _BV(WGM42);
-    TCCR4A &= ~_BV(WGM41);
-    TCCR4A &= ~_BV(WGM40);
-
-    TCCR4A |= _BV(COM4A1);
-    TCCR4A |= _BV(COM4A0);
-
-    TCCR4B &= ~_BV(CS42);
-    TCCR4B &= ~_BV(CS41);
-    TCCR4B |= ~_BV(CS40);
+    TCCR4A &= 0b00001100;
+    TCCR4A |= 0b10100001;
+    TCCR4B &= 0b11100000;
+    TCCR4B |= 0b00001001;
 
     TCNT4 = 0; // TCNT4 clear
 
@@ -293,11 +296,10 @@ ISR(TIMER1_COMPA_vect) {
     volatile unsigned short index_count = count;
     volatile unsigned char inter_check0 = check0;
     volatile unsigned char inter_check1 = check1;
-    volatile char inter_mode = mode;
+    volatile char inter_mode = playing_mode;
 
     switch (inter_mode) {
-
-    case 0: // 8-bit mono
+    case 0:
         if ((index_count + inter_check0) > 2999) {
             index_count = 0;
             inter_check0 = 1;
@@ -315,71 +317,18 @@ ISR(TIMER1_COMPA_vect) {
         OCR4A = (uint8_t)ptr[index_count];
 
         index_count += 1;
-
         count = index_count;
         check0 = inter_check0;
         check1 = inter_check1;
         break;
 
-    case 1: //16-bit mono
-        if ((index_count + inter_check0) > 2998) {
-            index_count = 0;
-            inter_check0 = 1;
-            index_a++;
-        }
-
-        if ((index_count + inter_check1) > 2998) {
-            index_a = 0;
-            index_count = 0;
-            inter_check1 = 1;
-        }
-        OCR2B = (uint8_t)ptr[index_count];
-        OCR2A = (uint8_t)ptr[index_count+1] + 0x80;
-        OCR4B = (uint8_t)ptr[index_count];
-        OCR4A = (uint8_t)ptr[index_count+1] + 0x80;
-
-        index_count += 2;
-
-        count = index_count;
-        check0 = inter_check0;
-        check1 = inter_check1;
-
-        break;
-
-    case 2: //8-bit stereo
-        if ((index_count + inter_check0) > 2998) {
-            index_count = 0;
-            inter_check0 = 1;
-            index_a++;
-        }
-
-        if ((index_count + inter_check1) > 2998) {
-            index_a = 0;
-            index_count = 0;
-            inter_check1 = 1;
-        }
-        OCR2B = (uint8_t)ptr[index_count];
-        OCR2A = (uint8_t)ptr[index_count];
-        OCR4B = (uint8_t)ptr[index_count];
-        OCR4A = (uint8_t)ptr[index_count];
-
-        index_count += 2;
-
-        count = index_count;
-        check0 = inter_check0;
-        check1 = inter_check1;
-
-        break;
-
-    case 3: //16-bit stereo
+    case 1:
         if ((index_count + inter_check0) > 2996) {
             index_count = 0;
             inter_check0 = 1;
-            index_a++;
         }
 
         if ((index_count + inter_check1) > 2996) {
-            index_a = 0;
             index_count = 0;
             inter_check1 = 1;
         }
@@ -388,14 +337,148 @@ ISR(TIMER1_COMPA_vect) {
         OCR4B = (uint8_t)ptr[index_count];
         OCR4A = (uint8_t)ptr[index_count + 1] + 0x80;
 
+        index_count += 2;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
+        break;
+
+    case 2:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count];
+        OCR4B = (uint8_t)ptr[index_count];
+        OCR4A = (uint8_t)ptr[index_count];
+
+        index_count += 1;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
+        break;
+
+    case 3:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count + 1] + 0x80;
+        OCR4B = (uint8_t)ptr[index_count];
+        OCR4A = (uint8_t)ptr[index_count + 1] +0x80;
+
+        index_count += 2;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
+        break;
+
+    case 4:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count];
+        OCR4B = (uint8_t)ptr[index_count + 1];
+        OCR4A = (uint8_t)ptr[index_count + 1];
+
+        index_count += 2;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
+        break;
+
+    case 5:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count + 1] + 0x80;
+        OCR4B = (uint8_t)ptr[index_count + 2];
+        OCR4A = (uint8_t)ptr[index_count + 3] + 0x80;
+
         index_count += 4;
         count = index_count;
         check0 = inter_check0;
         check1 = inter_check1;
+
+        break;
+
+    case 6:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count];
+        OCR4B = (uint8_t)ptr[index_count + 1];
+        OCR4A = (uint8_t)ptr[index_count + 1];
+
+        index_count += 2;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
+        break;
+
+    case 7:
+        if ((index_count + inter_check0) > 2996) {
+            index_count = 0;
+            inter_check0 = 1;
+        }
+
+        if ((index_count + inter_check1) > 2996) {
+            index_count = 0;
+            inter_check1 = 1;
+        }
+        OCR2B = (uint8_t)ptr[index_count];
+        OCR2A = (uint8_t)ptr[index_count + 1] + 0x80;
+        OCR4B = (uint8_t)ptr[index_count + 2];
+        OCR4A = (uint8_t)ptr[index_count + 3] + 0x80;
+
+        index_count += 4;
+        count = index_count;
+        check0 = inter_check0;
+        check1 = inter_check1;
+
         break;
 
     default:
         break;
     }
 
+   
 }

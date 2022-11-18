@@ -202,7 +202,7 @@ ISR(TIMER1_COMPA_vect) {
 
 
 	OCR2B = buffer[index_a][index_count];
-	OCR2A = buffer[index_a][index_count ];
+	OCR2A = buffer[index_a][index_count];
 	OCR4B = buffer[index_a][index_count];
 	OCR4A = buffer[index_a][index_count];
 

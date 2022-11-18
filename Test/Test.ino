@@ -128,7 +128,7 @@ void interrupt_init() {
 
 void timer_init() {
 	DDRB |= 0x10;
-	DDRH |= 0b01011000;
+	DDRH |= 0x58;
 	TCCR1A &= ~_BV(WGM10);
 	TCCR1A &= ~_BV(WGM11);
 
@@ -193,7 +193,7 @@ ISR(TIMER1_COMPA_vect) {
 	//default:
 	//	break;
 	//}
-	a = index_a;
+	/*a = index_a;*/
 	count = index_count;
 	check0 = inter_check0;
 	check1 = inter_check1;
