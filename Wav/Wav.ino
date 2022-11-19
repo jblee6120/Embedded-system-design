@@ -64,7 +64,6 @@ void setup() {
 }
 
 void loop() {
-    Serial.println(OCR2A);
     switch (play_state) {
 
     case 0: //일시정지
