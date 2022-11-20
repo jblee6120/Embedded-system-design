@@ -125,11 +125,9 @@ ISR(TIMER1_COMPA_vect) {
 	}
 	if (a == 2) a = 0;
 	OCR2A = (buffer[a][count]);
-	//OCR2A = ((buffer[a][count + 1] + 0x80) & 0xFF);
-	//OCR4B = buffer[a][count + 2];
-	//OCR4A = (buffer[a][count + 3] + 0x80) & 0xFF;
-
-	//Serial.println(OCR2B);
+	OCR2A = ((buffer[a][count + 1] + 0x80) & 0xFF);
+	OCR4B = buffer[a][count + 2];
+	OCR4A = (buffer[a][count + 3] + 0x80) & 0xFF;
 
 	count +=1;
 }

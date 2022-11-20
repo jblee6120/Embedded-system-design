@@ -6,7 +6,7 @@
 
 LiquidCrystal display(12, 11, 5, 4, 3, 2);
 File root;
-File entry[4]; //모든 파일들을 담는 파일 배열 생성
+File entry[16]; //모든 파일들을 담는 파일 배열 생성
 File stage;
 //개발 과정 중 파일명만 따로 뽑아서 출력하고, 한 개의 entry 클래스로
 //cnt 값에 맞는 파일을 열어 entry 클래스에 넣고 파일명을 저장하는 배열에 저장하려 했음.
