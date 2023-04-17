@@ -1,7 +1,7 @@
 //임베디드 시스템 설계 Line Tracer Project
 //File name: 
 //maker: 12151179 이윤호, 12181407 이종범
-//YouTube Link: 
+//YouTube Link: https://youtu.be/mmw1MJfEHBE
 //Abstract
 // 이 프로그램은 2개의 라인을 인식해 라인의 가운데를 따라 주행하는 Line Tracer 프로그램이다. 프로그램의 동작원리는 다음과 같다.
 // 1. 라인스캔카메라로 2개의 라인을 검출한다
@@ -27,12 +27,11 @@
 #define CLK PA0 //라인스캔센서의 CLK신호를 출력하는 핀을 전처리했음
 #define SI PA1 //센서에서 아날로그 신호를 출력 준비시키는 SI 핀을 전처리했음
 #define carrier_freq 20000 //DDA 알고리즘에서 carrier_freqency를 20kHz로 설정한다
-# define PI 3.141592654 //Low Pass Filter를 사용할 때 쓰이는 PI값을 정의
 
 long difference = 1000; //스텝모터의 회전속도 즉, 펄스 수의 급격한 변화로 발생하는 탈조를 막기위한 조속기 알고리즘의
                         //속도변화의 최댓값
 
-volatile unsigned int camera_data[140] = { 0 }; //센서의 ADC 값을 받아오는 배열, LPF를 거치지 않은 RAW data를 담는 배열이다
+volatile unsigned int camera_data[140] = { 0 }; //센서의 ADC 값을 받아오는 배열이다.
 
 void ADC_Init(); //ADC 초기화 함수
 
@@ -230,7 +229,7 @@ void Timer_Init()
 ISR(TIMER1_COMPA_vect) //Interrupt Service Routine으로 DDA 알고리즘 구현
 {
     Left_cnt1++; //cnt1을 1씩 증가시킨다
-    if (Left_cnt1 > Left_DDA_M) //cnt1이 DDA M을 넘아가게 되면
+    if (Left_cnt1 > Left_DDA_M) //cnt1이 DDA M을 넘어가게 되면
     {
         PORTD &= ~_BV(PD2); //스텝모터에 인가되는 펄스는 LOW신호가 된다(펄스의 지속시간 결정)
     }
@@ -245,7 +244,7 @@ ISR(TIMER1_COMPA_vect) //Interrupt Service Routine으로 DDA 알고리즘 구현
     }
 
     Right_cnt1++; //cnt1는 100씩 증가한다
-    if (Right_cnt1 > Right_DDA_M) //DDA A가 DDAB 넘어가게 되면
+    if (Right_cnt1 > Right_DDA_M) //cnt1가 DDA M을 넘어가게 되면
     {
         PORTD &= ~_BV(PD0); //스텝모터에 인가되는 펄스는 LOW신호가 된다(펄스의 지속시간 결정)
     }
